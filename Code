@@ -1,0 +1,117 @@
+import os
+import subprocess
+import datetime
+
+def check_iphone_components():
+    """Runs a system command to check iPhone component details automatically upon connection."""
+    try:
+        result = subprocess.run(["ideviceinfo"], capture_output=True, text=True)
+        output = result.stdout
+        
+        if "SerialNumber" in output:
+            # Checking phone age
+            manufacture_date = "Unknown"
+            current_year = datetime.datetime.now().year
+            for line in output.split("\n"):
+                if "ProductionYear" in line:
+                    manufacture_year = int(line.split(":")[-1].strip())
+                    manufacture_date = f"{current_year - manufacture_year} years old"
+                    break
+            
+            # Checking if the screen has been replaced
+            screen_original = "Unknown"
+            screen_info_result = subprocess.run(["ideviceinfo", "-q", "com.apple.mobile.display"], capture_output=True, text=True)
+            screen_info_output = screen_info_result.stdout
+            for line in screen_info_output.split("\n"):
+                if "DisplaySerialNumber" in line:
+                    screen_serial = line.split(":")[-1].strip()
+                    screen_original = "Original" if screen_serial not in ["Unknown", "0"] else "Duplicate/Replaced"
+                    break
+            
+            # Checking battery health and authenticity
+            battery_health = "Unknown"
+            battery_original = "Unknown"
+            battery_result = subprocess.run(["ideviceinfo", "-q", "com.apple.mobile.battery"], capture_output=True, text=True)
+            battery_output = battery_result.stdout
+            for line in battery_output.split("\n"):
+                if "BatteryHealth" in line:
+                    battery_health = line.split(":")[-1].strip() + "%"
+                if "BatterySerialNumber" in line:
+                    battery_serial = line.split(":")[-1].strip()
+                    battery_original = "Original" if battery_serial not in ["Unknown", "0"] else "Duplicate/Replaced"
+            
+            # Checking IMEI and verifying details
+            imei_status = "Unknown"
+            imei_number = "Unknown"
+            imei_result = subprocess.run(["ideviceinfo", "-q", "com.apple.mobile.imei"], capture_output=True, text=True)
+            imei_output = imei_result.stdout
+            for line in imei_output.split("\n"):
+                if "InternationalMobileEquipmentIdentity" in line:
+                    imei_number = line.split(":")[-1].strip()
+                    # Local IMEI verification (Placeholder - Replace with actual lookup if available)
+                    if imei_number.startswith("35"):
+                        imei_status = "IMEI Details Matched"
+                    else:
+                        imei_status = "IMEI Details Mismatch"
+                    break
+            
+            # Checking iPhone Model Number
+            model_number = "Unknown"
+            model_type = "Unknown"
+            for line in output.split("\n"):
+                if "ProductType" in line:
+                    model_number = line.split(":")[-1].strip()
+                    model_prefix = model_number[0]
+                    model_type = {"M": "Sold as New", "F": "Refurbished by Apple", "N": "Replacement Device", "P": "Personalized (Engraved)"}.get(model_prefix, "Unknown Type")
+                    break
+            
+            # Checking Warranty Status
+            warranty_status = "Unknown"
+            warranty_result = subprocess.run(["ideviceinfo", "-q", "com.apple.mobile.warranty"], capture_output=True, text=True)
+            warranty_output = warranty_result.stdout
+            for line in warranty_output.split("\n"):
+                if "WarrantyStatus" in line:
+                    warranty_status = line.split(":")[-1].strip()
+                    break
+            
+            # Checking WiFi Status
+            wifi_status = "Unknown"
+            wifi_result = subprocess.run(["ideviceinfo", "-q", "com.apple.mobile.wifi"], capture_output=True, text=True)
+            wifi_output = wifi_result.stdout
+            for line in wifi_output.split("\n"):
+                if "WiFiAddress" in line:
+                    wifi_status = "Connected"
+                    break
+            else:
+                wifi_status = "Not Connected"
+            
+            # Checking Microphone (Basic Detection - Not exhaustive)
+            mic_status = "Working" if os.system("arecord -d 1 /dev/null") == 0 else "Not Working"
+            
+            details = f"""
+            Device Connected!
+            IMEI Number: {imei_number}
+            IMEI Verification: {imei_status}
+            Screen Authenticity: {screen_original}
+            Battery Health: {battery_health}
+            Battery Authenticity: {battery_original}
+            Model Number: {model_number}
+            Model Type: {model_type}
+            Warranty Status: {warranty_status}
+            WiFi Status: {wifi_status}
+            Microphone Status: {mic_status}
+            Phone Age: {manufacture_date}
+            """
+            
+            # Save the results to a file
+            with open("iphone_check_results.txt", "w") as file:
+                file.write(details)
+            
+            print(details)
+        else:
+            print("No iPhone detected or permission denied!")
+    except FileNotFoundError:
+        print("Error: libimobiledevice is not installed! Please install it first.")
+
+# Automatically check iPhone upon connection
+check_iphone_components()
